@@ -39,13 +39,13 @@ type Text struct {
 	FontFace font.Face
 	FontSize float64
 	Color    color.Color
+	Point    image.Point
 }
 
 type Config struct {
 	Position LogoPosition
 	Padding  int
-	Title    Text
-	Subtitle Text
+	Texts    []Text
 }
 
 func NewOgImage(templateFile, logoFile string) (*OgImage, error) {
@@ -127,18 +127,11 @@ func (og *OgImage) Generate(outputFile string, config Config) error {
 
 	draw.Draw(output, logoBounds.Add(position), og.Logo, image.Point{}, draw.Over)
 
-	// Calculate positions for the title and subtitle
-	titlePosition := image.Point{padding, templateBounds.Max.Y/2 - 20}
-	subtitlePosition := image.Point{padding, templateBounds.Max.Y/2 + 20}
-
-	err := drawText(output, config.Title, titlePosition)
-	if err != nil {
-		return err
-	}
-
-	err = drawText(output, config.Subtitle, subtitlePosition)
-	if err != nil {
-		return err
+	for _, text := range config.Texts {
+		err := drawText(output, text)
+		if err != nil {
+			return err
+		}
 	}
 
 	outFile, err := os.Create(outputFile)
@@ -156,7 +149,25 @@ func (og *OgImage) Generate(outputFile string, config Config) error {
 	return b.Flush()
 }
 
-func drawText(img *image.RGBA, text Text, position image.Point) error {
+func (og *OgImage) GenerateDefault(outputFile string, title, subtitle Text, padding int) error {
+	templateBounds := og.Template.Bounds()
+
+	titlePosition := image.Point{padding, templateBounds.Max.Y/2 - 20}
+	subtitlePosition := image.Point{padding, templateBounds.Max.Y/2 + 20}
+
+	title.Point = titlePosition
+	subtitle.Point = subtitlePosition
+
+	config := Config{
+		Position: BottomRight,
+		Padding:  padding,
+		Texts:    []Text{title, subtitle},
+	}
+
+	return og.Generate(outputFile, config)
+}
+
+func drawText(img *image.RGBA, text Text) error {
 	if text.FontFace == nil && text.FontFile != "" {
 		face, err := loadFont(text.FontFile, text.FontSize)
 		if err != nil {
@@ -177,8 +188,8 @@ func drawText(img *image.RGBA, text Text, position image.Point) error {
 	}
 
 	point := fixed.Point26_6{
-		X: fixed.I(position.X),
-		Y: fixed.I(position.Y),
+		X: fixed.I(text.Point.X),
+		Y: fixed.I(text.Point.Y),
 	}
 
 	d := &font.Drawer{

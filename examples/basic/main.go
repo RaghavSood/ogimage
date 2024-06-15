@@ -1,6 +1,7 @@
 package main
 
 import (
+	"image"
 	"image/color"
 	"log"
 
@@ -18,6 +19,7 @@ func main() {
 		FontFile: "menlo.ttf", // Specify your font file here
 		FontSize: 64,
 		Color:    color.White,
+		Point:    image.Point{20, 305}, // Custom position for this text
 	}
 
 	subtitle := ogimage.Text{
@@ -25,16 +27,29 @@ func main() {
 		FontFile: "menlo.ttf", // Specify your font file here
 		FontSize: 25,
 		Color:    color.White,
+		Point:    image.Point{20, 345}, // Custom position for this text
+	}
+
+	err = ogImage.GenerateDefault("output.png", title, subtitle, 10)
+	if err != nil {
+		log.Fatalf("failed to generate image: %v", err)
+	}
+
+	anotherText := ogimage.Text{
+		Content:  "That's worth $1,234,567,890,239.12",
+		FontFile: "menlo.ttf",
+		FontSize: 30,
+		Color:    color.White,
+		Point:    image.Point{20, 450}, // Custom position for this text
 	}
 
 	config := ogimage.Config{
 		Position: ogimage.BottomRight,
-		Padding:  10,
-		Title:    title,
-		Subtitle: subtitle,
+		Padding:  20,
+		Texts:    []ogimage.Text{title, subtitle, anotherText},
 	}
 
-	err = ogImage.Generate("output.png", config)
+	err = ogImage.Generate("output2.png", config)
 	if err != nil {
 		log.Fatalf("failed to generate image: %v", err)
 	}
