@@ -7,14 +7,13 @@ import (
 	"image/color"
 	"image/draw"
 	_ "image/gif"
+	"image/jpeg"
 	_ "image/jpeg"
-	"image/png"
 	_ "image/png"
 	"io/ioutil"
 	"os"
 
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 )
@@ -128,12 +127,16 @@ func (og *OgImage) Generate(outputFile string, config Config) error {
 
 	draw.Draw(output, logoBounds.Add(position), og.Logo, image.Point{}, draw.Over)
 
-	err := drawText(output, config.Title, image.Point{templateBounds.Max.X / 2, padding + 20})
+	// Calculate positions for the title and subtitle
+	titlePosition := image.Point{padding, templateBounds.Max.Y/2 - 20}
+	subtitlePosition := image.Point{padding, templateBounds.Max.Y/2 + 20}
+
+	err := drawText(output, config.Title, titlePosition)
 	if err != nil {
 		return err
 	}
 
-	err = drawText(output, config.Subtitle, image.Point{templateBounds.Max.X / 2, padding + 60})
+	err = drawText(output, config.Subtitle, subtitlePosition)
 	if err != nil {
 		return err
 	}
@@ -145,7 +148,7 @@ func (og *OgImage) Generate(outputFile string, config Config) error {
 	defer outFile.Close()
 
 	b := bufio.NewWriter(outFile)
-	err = png.Encode(b, output)
+	err = jpeg.Encode(b, output, nil)
 	if err != nil {
 		return err
 	}
@@ -161,7 +164,11 @@ func drawText(img *image.RGBA, text Text, position image.Point) error {
 		}
 		text.FontFace = face
 	} else if text.FontFace == nil {
-		text.FontFace = basicfont.Face7x13
+		face, err := loadFont("path/to/default/font.ttf", text.FontSize)
+		if err != nil {
+			return err
+		}
+		text.FontFace = face
 	}
 
 	col := text.Color
@@ -170,7 +177,7 @@ func drawText(img *image.RGBA, text Text, position image.Point) error {
 	}
 
 	point := fixed.Point26_6{
-		X: fixed.I(position.X - (len(text.Content)*int(text.FontSize))/4),
+		X: fixed.I(position.X),
 		Y: fixed.I(position.Y),
 	}
 

@@ -14,17 +14,17 @@ func main() {
 	}
 
 	title := ogimage.Text{
-		Content:  "Sample Title",
+		Content:  "1,232,232.12345678 BTC BURNED",
 		FontFile: "menlo.ttf", // Specify your font file here
-		FontSize: 40,
-		Color:    color.RGBA{255, 0, 0, 255},
+		FontSize: 64,
+		Color:    color.White,
 	}
 
 	subtitle := ogimage.Text{
-		Content:  "Sample Subtitle",
+		Content:  "Tranasction 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 		FontFile: "menlo.ttf", // Specify your font file here
-		FontSize: 20,
-		Color:    color.RGBA{0, 0, 255, 255},
+		FontSize: 25,
+		Color:    color.White,
 	}
 
 	config := ogimage.Config{
