@@ -2,16 +2,15 @@ package ogimage
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
 	_ "image/gif"
-	"image/jpeg"
 	_ "image/jpeg"
+	"image/png"
 	_ "image/png"
-	"io/ioutil"
-	"os"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
@@ -35,7 +34,7 @@ const (
 
 type Text struct {
 	Content  string
-	FontFile string
+	FontData []byte
 	FontFace font.Face
 	FontSize float64
 	Color    color.Color
@@ -48,44 +47,32 @@ type Config struct {
 	Texts    []Text
 }
 
-func NewOgImage(templateFile, logoFile string) (*OgImage, error) {
-	template, err := loadImage(templateFile)
+func NewOgImage(templateData, logoData []byte) (*OgImage, error) {
+	template, err := decodeImage(templateData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load template image: %v", err)
+		return nil, fmt.Errorf("failed to decode template image: %w", err)
 	}
 
-	logo, err := loadImage(logoFile)
+	logo, err := decodeImage(logoData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load logo image: %v", err)
+		return nil, fmt.Errorf("failed to decode logo image: %w", err)
 	}
 
 	return &OgImage{Template: template, Logo: logo}, nil
 }
 
-func loadImage(filePath string) (image.Image, error) {
-	file, err := os.Open(filePath)
+func decodeImage(data []byte) (image.Image, error) {
+	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %v", filePath, err)
+		return nil, fmt.Errorf("failed to decode image: %w", err)
 	}
-	defer file.Close()
-
-	img, _, err := image.Decode(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode image %s: %v", filePath, err)
-	}
-
 	return img, nil
 }
 
-func loadFont(filePath string, size float64) (font.Face, error) {
-	fontBytes, err := ioutil.ReadFile(filePath)
+func loadFont(fontData []byte, size float64) (font.Face, error) {
+	f, err := opentype.Parse(fontData)
 	if err != nil {
-		return nil, err
-	}
-
-	f, err := opentype.Parse(fontBytes)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse font data: %w", err)
 	}
 
 	face, err := opentype.NewFace(f, &opentype.FaceOptions{
@@ -93,13 +80,13 @@ func loadFont(filePath string, size float64) (font.Face, error) {
 		DPI:  72,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create font face: %w", err)
 	}
 
 	return face, nil
 }
 
-func (og *OgImage) Generate(outputFile string, config Config) error {
+func (og *OgImage) Generate(config Config) ([]byte, error) {
 	output := image.NewRGBA(og.Template.Bounds())
 	draw.Draw(output, og.Template.Bounds(), og.Template, image.Point{}, draw.Over)
 
@@ -130,26 +117,26 @@ func (og *OgImage) Generate(outputFile string, config Config) error {
 	for _, text := range config.Texts {
 		err := drawText(output, text)
 		if err != nil {
-			return err
+			return nil, fmt.Errorf("failed to draw text: %w", err)
 		}
 	}
 
-	outFile, err := os.Create(outputFile)
+	var buf bytes.Buffer
+	b := bufio.NewWriter(&buf)
+	err := png.Encode(b, output)
 	if err != nil {
-		return err
-	}
-	defer outFile.Close()
-
-	b := bufio.NewWriter(outFile)
-	err = jpeg.Encode(b, output, nil)
-	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to encode image: %w", err)
 	}
 
-	return b.Flush()
+	err = b.Flush()
+	if err != nil {
+		return nil, fmt.Errorf("failed to flush buffer: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }
 
-func (og *OgImage) GenerateDefault(outputFile string, title, subtitle Text, padding int) error {
+func (og *OgImage) GenerateDefault(title, subtitle Text, padding int) ([]byte, error) {
 	templateBounds := og.Template.Bounds()
 
 	titlePosition := image.Point{padding, templateBounds.Max.Y/2 - 20}
@@ -164,22 +151,18 @@ func (og *OgImage) GenerateDefault(outputFile string, title, subtitle Text, padd
 		Texts:    []Text{title, subtitle},
 	}
 
-	return og.Generate(outputFile, config)
+	return og.Generate(config)
 }
 
 func drawText(img *image.RGBA, text Text) error {
-	if text.FontFace == nil && text.FontFile != "" {
-		face, err := loadFont(text.FontFile, text.FontSize)
+	if text.FontFace == nil && text.FontData != nil {
+		face, err := loadFont(text.FontData, text.FontSize)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to load font: %w", err)
 		}
 		text.FontFace = face
 	} else if text.FontFace == nil {
-		face, err := loadFont("path/to/default/font.ttf", text.FontSize)
-		if err != nil {
-			return err
-		}
-		text.FontFace = face
+		return nil // No font face provided and no default specified
 	}
 
 	col := text.Color
