@@ -16,6 +16,21 @@ type OgImage struct {
 	Logo     image.Image
 }
 
+type LogoPosition int
+
+const (
+	TopLeft LogoPosition = iota
+	TopRight
+	BottomLeft
+	BottomRight
+	Center
+)
+
+type Config struct {
+	Position LogoPosition
+	Padding  int
+}
+
 func NewOgImage(templateFile, logoFile string) (*OgImage, error) {
 	template, err := loadImage(templateFile)
 	if err != nil {
@@ -45,14 +60,37 @@ func loadImage(filePath string) (image.Image, error) {
 	return img, nil
 }
 
-func (og *OgImage) Generate(outputFile string) error {
+func (og *OgImage) Generate(outputFile string, config Config) error {
 	output := image.NewRGBA(og.Template.Bounds())
 	draw.Draw(output, og.Template.Bounds(), og.Template, image.Point{}, draw.Over)
-	draw.Draw(output, og.Logo.Bounds().Add(image.Point{10, 10}), og.Logo, image.Point{}, draw.Over)
+
+	logoBounds := og.Logo.Bounds()
+	templateBounds := og.Template.Bounds()
+
+	padding := config.Padding
+	if padding < 0 {
+		padding = 0
+	}
+
+	var position image.Point
+	switch config.Position {
+	case TopLeft:
+		position = image.Point{padding, padding}
+	case TopRight:
+		position = image.Point{templateBounds.Max.X - logoBounds.Max.X - padding, padding}
+	case BottomLeft:
+		position = image.Point{padding, templateBounds.Max.Y - logoBounds.Max.Y - padding}
+	case BottomRight:
+		position = image.Point{templateBounds.Max.X - logoBounds.Max.X - padding, templateBounds.Max.Y - logoBounds.Max.Y - padding}
+	case Center:
+		position = image.Point{(templateBounds.Max.X - logoBounds.Max.X) / 2, (templateBounds.Max.Y - logoBounds.Max.Y) / 2}
+	}
+
+	draw.Draw(output, logoBounds.Add(position), og.Logo, image.Point{}, draw.Over)
 
 	outFile, err := os.Create(outputFile)
 	if err != nil {
-		return fmt.Errorf("failed to create output file %s: %v", outputFile, err)
+		return err
 	}
 	defer outFile.Close()
 

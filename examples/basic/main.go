@@ -12,7 +12,12 @@ func main() {
 		log.Fatalf("failed to create ogimage: %v", err)
 	}
 
-	err = ogImage.Generate("output.jpg")
+	config := ogimage.Config{
+		Position: ogimage.BottomRight,
+		Padding:  20,
+	}
+
+	err = ogImage.Generate("output.jpg", config)
 	if err != nil {
 		log.Fatalf("failed to generate image: %v", err)
 	}
